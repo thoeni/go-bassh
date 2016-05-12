@@ -9,11 +9,12 @@ import (
 	"os"
 
 	"encoding/pem"
+	"strings"
+	"syscall"
+
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/terminal"
-	"strings"
-	"syscall"
 )
 
 type sshCommand struct {
