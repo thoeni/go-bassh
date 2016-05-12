@@ -1,4 +1,4 @@
-package main
+package bassh
 
 import (
 	"crypto/x509"
@@ -203,12 +203,8 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 	}
 }
 
-func main() {
-	// ssh.Password("your_password")
-	sshConfig := configureCredentialsInteractive()
-
-	client := createClientInteractive(sshConfig)
-
+// RunSSH executes /bin/bash on the remote host specified within the *SSHClient
+func RunSSH(client *SSHClient) {
 	cmd := &sshCommand{
 		Path:   "/bin/bash",
 		Env:    []string{""},
@@ -217,6 +213,10 @@ func main() {
 		Stderr: os.Stderr,
 	}
 
+	run(client, cmd)
+}
+
+func run(client *SSHClient, cmd *sshCommand) {
 	fmt.Printf("Running command: %s on the remote host\n", cmd.Path)
 	if err := client.RunCommand(cmd); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)

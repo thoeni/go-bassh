@@ -1,5 +1,0 @@
-.idea
-*.iml
-pkg/**
-src/
-!src/thoeni.github.io/**
