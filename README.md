@@ -1,4 +1,4 @@
-#go-bassh
+#go-bassh [![Go Report Card](https://goreportcard.com/badge/github.com/thoeni/go-bassh)](https://goreportcard.com/report/github.com/thoeni/go-bassh)
 
 `go-bassh` library can be used to quickly open a tty on a remote server, given username, .pem key (at the moment only key without passphrase, but soon the passphrase will be supported), the ip address of the machine, and the SSH port
 
