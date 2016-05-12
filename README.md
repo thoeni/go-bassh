@@ -4,7 +4,7 @@
 
 ###Usage example
 
-```
+```go
 package main
 
 import (
