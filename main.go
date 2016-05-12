@@ -24,13 +24,15 @@ type sshCommand struct {
 	Stderr io.Writer
 }
 
-type sshClient struct {
+// SSHClient wraps the ssh client configuration and the host/port information
+type SSHClient struct {
 	Config *ssh.ClientConfig
 	Host   string
 	Port   int
 }
 
-func (client *sshClient) RunCommand(cmd *sshCommand) error {
+// RunCommand opens an SSH session and runs the command passed as an argument
+func (client *SSHClient) RunCommand(cmd *sshCommand) error {
 	var (
 		session *ssh.Session
 		err     error
@@ -49,7 +51,7 @@ func (client *sshClient) RunCommand(cmd *sshCommand) error {
 	return err
 }
 
-func (client *sshClient) prepareCommand(session *ssh.Session, cmd *sshCommand) error {
+func (client *SSHClient) prepareCommand(session *ssh.Session, cmd *sshCommand) error {
 	for _, env := range cmd.Env {
 		variable := strings.Split(env, "=")
 		if len(variable) != 2 {
@@ -89,7 +91,7 @@ func (client *sshClient) prepareCommand(session *ssh.Session, cmd *sshCommand) e
 	return nil
 }
 
-func (client *sshClient) newSession() (*ssh.Session, error) {
+func (client *SSHClient) newSession() (*ssh.Session, error) {
 	connection, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", client.Host, client.Port), client.Config)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial: %s", err)
@@ -169,7 +171,7 @@ func sshAgent() ssh.AuthMethod {
 	return nil
 }
 
-func configureCredentials() *ssh.ClientConfig {
+func configureCredentialsInteractive() *ssh.ClientConfig {
 	var config ssh.ClientConfig
 	fmt.Printf("SSH username: ")
 	fmt.Scanf("%s", &config.User)
@@ -180,15 +182,32 @@ func configureCredentials() *ssh.ClientConfig {
 	return &config
 }
 
+func createClientInteractive(sshConfig *ssh.ClientConfig) *SSHClient {
+	fmt.Printf("IP address: ")
+	var ipAddr string
+	var port int
+	fmt.Scanf("%s", &ipAddr)
+	fmt.Printf("SSH port: ")
+	fmt.Scanf("%d", &port)
+
+	return CreateClient(sshConfig, ipAddr, port)
+}
+
+// CreateClient takes a *ssh.ClientConfig struct as input, ipAddress of the target
+// machine and the ssh port, and returns an *SSHClient where a command can be run on
+func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClient {
+	return &SSHClient{
+		Config: sshConfig,
+		Host:   ipAddr,
+		Port:   port,
+	}
+}
+
 func main() {
 	// ssh.Password("your_password")
-	sshConfig := configureCredentials()
+	sshConfig := configureCredentialsInteractive()
 
-	client := &sshClient{
-		Config: sshConfig,
-		Host:   "52.18.96.94",
-		Port:   22,
-	}
+	client := createClientInteractive(sshConfig)
 
 	cmd := &sshCommand{
 		Path:   "/bin/bash",
@@ -198,7 +217,7 @@ func main() {
 		Stderr: os.Stderr,
 	}
 
-	fmt.Printf("Running command: %s\n", cmd.Path)
+	fmt.Printf("Running command: %s on the remote host\n", cmd.Path)
 	if err := client.RunCommand(cmd); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
 		os.Exit(1)
