@@ -116,9 +116,7 @@ func (client *SSHClient) newSession() (*ssh.Session, error) {
 	return session, nil
 }
 
-// DecodeKeyForAuthMethod decrypts and decodes the private pem key indicated as
-//	fully qualified path on the OS and returns the ssh.AuthMethod
-func DecodeKeyForAuthMethod(file string) ssh.AuthMethod {
+func decodeKeyForAuthMethod(file string) ssh.AuthMethod {
 	fmt.Printf("Private key is at: %s", file)
 	buffer, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -180,7 +178,17 @@ func configureCredentialsInteractive() *ssh.ClientConfig {
 	var pemKeyPath string
 	fmt.Printf("SSH pem key location (absolute path): ")
 	fmt.Scanf("%s", &pemKeyPath)
-	config.Auth = []ssh.AuthMethod{(DecodeKeyForAuthMethod(pemKeyPath))}
+	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyPath))}
+	return &config
+}
+
+// ConfigureCredentials returns the ClientConfig struct to be used as part of the
+// SSHClient definition
+func ConfigureCredentials(username string, keypath string) *ssh.ClientConfig {
+	var config ssh.ClientConfig
+	config.User = username
+	pemKeyPath := keypath
+	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyPath))}
 	return &config
 }
 
