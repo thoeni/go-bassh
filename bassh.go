@@ -227,6 +227,22 @@ func RunSSH(client *SSHClient) {
 	run(client, cmd)
 }
 
+// RunSSHInteractive executes /bin/bash on the remote host specified interactively by the user
+func RunSSHInteractive() {
+	cmd := &sshCommand{
+		Path:   "/bin/bash",
+		Env:    []string{""},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	sshConfig := configureCredentialsInteractive()
+	client := createClientInteractive(sshConfig)
+
+	run(client, cmd)
+}
+
 func run(client *SSHClient, cmd *sshCommand) {
 	fmt.Printf("Running command: %s on the remote host\n", cmd.Path)
 	if err := client.RunCommand(cmd); err != nil {
