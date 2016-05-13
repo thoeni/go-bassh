@@ -14,6 +14,6 @@ import (
 func main() {
 	sshConfig := bassh.ConfigureCredentials("ubuntu", "/Users/johndoe/.ssh/myprivatekey.pem")
 	client := bassh.CreateClient(sshConfig, "123.234.123.234", 22)
-	bassh.RunSSH(client)
+	client.RunBash()
 }
 ```
