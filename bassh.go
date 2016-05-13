@@ -225,6 +225,7 @@ func (client *SSHClient) Run(command string) {
 		}
 		os.Exit(1)
 	}
+	return
 }
 
 //RunBash runs /bin/bash on the client
