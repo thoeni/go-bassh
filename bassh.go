@@ -229,6 +229,14 @@ func (client *SSHClient) Run(command string) {
 
 //RunBash runs /bin/bash on the client
 func (client *SSHClient) RunBash() {
+	params := &SSHParams{
+		Env:    []string{""},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	client.InitSession(params)
 	client.Run("/bin/bash")
 }
 
