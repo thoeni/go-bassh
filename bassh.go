@@ -17,43 +17,45 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-type sshCommand struct {
-	Path   string
+//SSHParams contains params to setup the Session
+type SSHParams struct {
 	Env    []string
 	Stdin  io.Reader
 	Stdout io.Writer
 	Stderr io.Writer
 }
 
-// SSHClient wraps the ssh client configuration and the host/port information
+//SSHClient wraps the ssh client configuration and the host/port information
 type SSHClient struct {
-	Config *ssh.ClientConfig
-	Host   string
-	Port   int
+	Session *ssh.Session
+	Config  *ssh.ClientConfig
+	Host    string
+	Port    int
 }
 
-// RunCommand opens an SSH session and runs the command passed as an argument
-func (client *SSHClient) RunCommand(cmd *sshCommand) error {
+//InitSession returns a session initialised with the given params
+func (client *SSHClient) InitSession(params *SSHParams) (*SSHClient, error) {
 	var (
 		session *ssh.Session
 		err     error
 	)
 
 	if session, err = client.newSession(); err != nil {
-		return err
+		return nil, err
 	}
 	defer session.Close()
 
-	if err = client.prepareCommand(session, cmd); err != nil {
-		return err
+	if err = client.prepareCommand(session, params); err != nil {
+		return nil, err
 	}
 
-	err = session.Run(cmd.Path)
-	return err
+	client.Session = session
+
+	return client, nil
 }
 
-func (client *SSHClient) prepareCommand(session *ssh.Session, cmd *sshCommand) error {
-	for _, env := range cmd.Env {
+func (client *SSHClient) prepareCommand(session *ssh.Session, params *SSHParams) error {
+	for _, env := range params.Env {
 		variable := strings.Split(env, "=")
 		if len(variable) != 2 {
 			continue
@@ -65,28 +67,28 @@ func (client *SSHClient) prepareCommand(session *ssh.Session, cmd *sshCommand) e
 		}
 	}
 
-	if cmd.Stdin != nil {
+	if params.Stdin != nil {
 		stdin, err := session.StdinPipe()
 		if err != nil {
 			return fmt.Errorf("Unable to setup stdin for session: %v", err)
 		}
-		go io.Copy(stdin, cmd.Stdin)
+		go io.Copy(stdin, params.Stdin)
 	}
 
-	if cmd.Stdout != nil {
+	if params.Stdout != nil {
 		stdout, err := session.StdoutPipe()
 		if err != nil {
 			return fmt.Errorf("Unable to setup stdout for session: %v", err)
 		}
-		go io.Copy(cmd.Stdout, stdout)
+		go io.Copy(params.Stdout, stdout)
 	}
 
-	if cmd.Stderr != nil {
+	if params.Stderr != nil {
 		stderr, err := session.StderrPipe()
 		if err != nil {
 			return fmt.Errorf("Unable to setup stderr for session: %v", err)
 		}
-		go io.Copy(cmd.Stderr, stderr)
+		go io.Copy(params.Stderr, stderr)
 	}
 
 	return nil
@@ -176,20 +178,20 @@ func configureCredentialsInteractive() *ssh.ClientConfig {
 	var config ssh.ClientConfig
 	fmt.Printf("SSH username: ")
 	fmt.Scanf("%s", &config.User)
-	var pemKeyPath string
+	var pemKeyCommand string
 	fmt.Printf("SSH pem key location (absolute path): ")
-	fmt.Scanf("%s", &pemKeyPath)
-	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyPath))}
+	fmt.Scanf("%s", &pemKeyCommand)
+	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
 	return &config
 }
 
-// ConfigureCredentials returns the ClientConfig struct to be used as part of the
-// SSHClient definition
+//ConfigureCredentials returns the ClientConfig struct to be used as part of the
+//SSHClient definition
 func ConfigureCredentials(username string, keypath string) *ssh.ClientConfig {
 	var config ssh.ClientConfig
 	config.User = username
-	pemKeyPath := keypath
-	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyPath))}
+	pemKeyCommand := keypath
+	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
 	return &config
 }
 
@@ -204,8 +206,8 @@ func createClientInteractive(sshConfig *ssh.ClientConfig) *SSHClient {
 	return CreateClient(sshConfig, ipAddr, port)
 }
 
-// CreateClient takes a *ssh.ClientConfig struct as input, ipAddress of the target
-// machine and the ssh port, and returns an *SSHClient where a command can be run on
+//CreateClient takes a *ssh.ClientConfig struct as input, ipAddress of the target
+//machine and the ssh port, and returns an *SSHClient where a command can be Run on
 func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClient {
 	return &SSHClient{
 		Config: sshConfig,
@@ -214,23 +216,26 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 	}
 }
 
-// RunSSH executes /bin/bash on the remote host specified within the *SSHClient
-func RunSSH(client *SSHClient) {
-	cmd := &sshCommand{
-		Path:   "/bin/bash",
-		Env:    []string{""},
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+//Run opens an SSH session and Runs the command passed as an argument
+func (client *SSHClient) Run(command string) {
+	if err := client.Session.Run(command); err != nil {
+		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
+		if client.Session == nil {
+			fmt.Println("Session not initialised.")
+		}
+		os.Exit(1)
 	}
-
-	run(client, cmd)
 }
 
-// RunSSHInteractive executes /bin/bash on the remote host specified interactively by the user
-func RunSSHInteractive() {
-	cmd := &sshCommand{
-		Path:   "/bin/bash",
+//RunBash runs /bin/bash on the client
+func (client *SSHClient) RunBash() {
+	client.Run("/bin/bash")
+}
+
+//RunSSHInteractive allows the user to configure the SSH client interactively and
+//executes /bin/bash on the remote host specified interactively by the user
+func RunBashInteractive() {
+	params := &SSHParams{
 		Env:    []string{""},
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
@@ -240,13 +245,6 @@ func RunSSHInteractive() {
 	sshConfig := configureCredentialsInteractive()
 	client := createClientInteractive(sshConfig)
 
-	run(client, cmd)
-}
-
-func run(client *SSHClient, cmd *sshCommand) {
-	fmt.Printf("Running command: %s on the remote host\n", cmd.Path)
-	if err := client.RunCommand(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
-		os.Exit(1)
-	}
+	client.InitSession(params)
+	client.Run("/bin/bash")
 }
