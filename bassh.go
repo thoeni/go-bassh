@@ -34,24 +34,23 @@ type SSHClient struct {
 }
 
 //InitSession returns a session initialised with the given params
-func (client *SSHClient) InitSession(params *SSHParams) (*SSHClient, error) {
+func (client *SSHClient) InitSession(params *SSHParams) error {
 	var (
 		session *ssh.Session
 		err     error
 	)
 
 	if session, err = client.newSession(); err != nil {
-		return nil, err
+		return err
 	}
-	defer session.Close()
 
 	if err = client.prepareCommand(session, params); err != nil {
-		return nil, err
+		return err
 	}
 
 	client.Session = session
 
-	return client, nil
+	return nil
 }
 
 func (client *SSHClient) prepareCommand(session *ssh.Session, params *SSHParams) error {
@@ -218,6 +217,7 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 
 //Run opens an SSH session and Runs the command passed as an argument
 func (client *SSHClient) Run(command string) {
+	defer client.Session.Close()
 	if err := client.Session.Run(command); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
 		if client.Session == nil {
@@ -236,11 +236,12 @@ func (client *SSHClient) RunBash() {
 		Stderr: os.Stderr,
 	}
 
-	client.InitSession(params)
-	client.Run("/bin/bash")
+	if err := client.InitSession(params); err == nil {
+		client.Run("/bin/bash")
+	}
 }
 
-//RunSSHInteractive allows the user to configure the SSH client interactively and
+//RunBashInteractive allows the user to configure the SSH client interactively and
 //executes /bin/bash on the remote host specified interactively by the user
 func RunBashInteractive() {
 	params := &SSHParams{
@@ -253,6 +254,7 @@ func RunBashInteractive() {
 	sshConfig := configureCredentialsInteractive()
 	client := createClientInteractive(sshConfig)
 
-	client.InitSession(params)
-	client.Run("/bin/bash")
+	if err := client.InitSession(params); err == nil {
+		client.Run("/bin/bash")
+	}
 }
