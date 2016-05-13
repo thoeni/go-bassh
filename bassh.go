@@ -137,6 +137,7 @@ func decodeKeyForAuthMethod(file string) ssh.AuthMethod {
 		return nil
 	}
 	fmt.Println("Private key succesfully decripted and decoded.")
+
 	return ssh.PublicKeys(key)
 }
 
@@ -168,6 +169,7 @@ func decryptIfEncrypted(buffer []byte) []byte {
 		return pem.EncodeToMemory(&newBlock)
 	}
 	fmt.Println("Key is not encrypted.")
+
 	return buffer
 }
 
@@ -186,6 +188,7 @@ func configureCredentialsInteractive() *ssh.ClientConfig {
 	fmt.Printf("SSH pem key location (absolute path): ")
 	fmt.Scanf("%s", &pemKeyCommand)
 	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
+
 	return &config
 }
 
@@ -196,6 +199,7 @@ func ConfigureCredentials(username string, keypath string) *ssh.ClientConfig {
 	config.User = username
 	pemKeyCommand := keypath
 	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
+
 	return &config
 }
 
