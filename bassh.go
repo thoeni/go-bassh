@@ -53,6 +53,11 @@ func (client *SSHClient) InitSession(params *SSHParams) error {
 	return nil
 }
 
+//CloseSession closes the session for the client
+func (client *SSHClient) CloseSession() {
+	client.Session.Close()
+}
+
 func (client *SSHClient) prepareCommand(session *ssh.Session, params *SSHParams) error {
 	for _, env := range params.Env {
 		variable := strings.Split(env, "=")
@@ -217,7 +222,7 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 
 //Run opens an SSH session and Runs the command passed as an argument
 func (client *SSHClient) Run(command string) {
-	defer client.Session.Close()
+	defer client.CloseSession()
 	if err := client.Session.Run(command); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
 		if client.Session == nil {
