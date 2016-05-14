@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 
+	"errors"
+
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/terminal"
@@ -123,31 +125,34 @@ func (client *SSHClient) newSession() (*ssh.Session, error) {
 	return session, nil
 }
 
-func decodeKeyForAuthMethod(file string) ssh.AuthMethod {
-	fmt.Printf("Private key is at: %s", file)
+func decodeKeyForAuthMethod(file string) (ssh.AuthMethod, error) {
+	fmt.Printf("Private key is at: %s\n", file)
 	buffer, err := ioutil.ReadFile(file)
 	if err != nil {
 		fmt.Println("Error while reading the file: ", err)
-		return nil
+		return nil, errors.New("Error while reading the .pem file from disk!")
 	}
-	decryptedBuffer := decryptIfEncrypted(buffer)
-	key, err := ssh.ParsePrivateKey(decryptedBuffer)
-	if err != nil {
-		fmt.Println("Error while parsing private key: ", err)
-		return nil
-	}
-	fmt.Println("Private key succesfully decripted and decoded.")
+	if decryptedBuffer, err := decryptIfEncrypted(buffer); err != nil {
+		return nil, err
+	} else {
+		key, err := ssh.ParsePrivateKey(decryptedBuffer)
+		if err != nil {
+			fmt.Println("Error while parsing private key: ", err)
+			return nil, err
+		}
+		fmt.Println("Private key succesfully decripted and decoded.")
 
-	return ssh.PublicKeys(key)
+		return ssh.PublicKeys(key), nil
+	}
 }
 
-func decryptIfEncrypted(buffer []byte) []byte {
+func decryptIfEncrypted(buffer []byte) ([]byte, error) {
 	//  Decode the key extracting the pem.Block structure
 	block, _ := pem.Decode(buffer)
 	if block == nil {
-		panic("failed to parse certificate PEM")
+		return nil, errors.New("Failed to decode certificate buffer")
 	}
-	//  Verify if the pem.block is Ecnrypted
+	//  Verify if the pem.block is Encrypted
 	if x509.IsEncryptedPEMBlock(block) {
 		fmt.Println("Key is encrypted, specify decrypt passphrase: ")
 		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
@@ -158,7 +163,7 @@ func decryptIfEncrypted(buffer []byte) []byte {
 		decryptedPem, err := x509.DecryptPEMBlock(block, []byte(strings.TrimSpace(passphrase)))
 		if err != nil {
 			fmt.Println("Error while reading the file: ", err)
-			panic("failed to decrypt certificate PEM")
+			return nil, err
 		}
 		//  Recreating the decoded block to be returned
 		var newBlock pem.Block
@@ -166,11 +171,11 @@ func decryptIfEncrypted(buffer []byte) []byte {
 		newBlock.Headers = block.Headers
 		newBlock.Bytes = decryptedPem
 		//  Encoding block into []byte and returning
-		return pem.EncodeToMemory(&newBlock)
+		return pem.EncodeToMemory(&newBlock), nil
 	}
 	fmt.Println("Key is not encrypted.")
 
-	return buffer
+	return buffer, nil
 }
 
 func sshAgent() ssh.AuthMethod {
@@ -180,27 +185,30 @@ func sshAgent() ssh.AuthMethod {
 	return nil
 }
 
-func configureCredentialsInteractive() *ssh.ClientConfig {
-	var config ssh.ClientConfig
+func configureCredentialsInteractive() (*ssh.ClientConfig, error) {
+	var user, pemKeyLocation string
 	fmt.Printf("SSH username: ")
-	fmt.Scanf("%s", &config.User)
-	var pemKeyCommand string
+	fmt.Scanf("%s", &user)
 	fmt.Printf("SSH pem key location (absolute path): ")
-	fmt.Scanf("%s", &pemKeyCommand)
-	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
+	fmt.Scanf("%s", &pemKeyLocation)
 
-	return &config
+	return ConfigureCredentials(user, pemKeyLocation)
 }
 
 //ConfigureCredentials returns the ClientConfig struct to be used as part of the
 //SSHClient definition
-func ConfigureCredentials(username string, keypath string) *ssh.ClientConfig {
+func ConfigureCredentials(username string, keypath string) (*ssh.ClientConfig, error) {
 	var config ssh.ClientConfig
 	config.User = username
 	pemKeyCommand := keypath
-	config.Auth = []ssh.AuthMethod{(decodeKeyForAuthMethod(pemKeyCommand))}
+	if authMethod, err := decodeKeyForAuthMethod(pemKeyCommand); err == nil {
+		config.Auth = []ssh.AuthMethod{authMethod}
+		return &config, nil
+	} else {
+		return nil, err
+	}
 
-	return &config
+	return &config, nil
 }
 
 func createClientInteractive(sshConfig *ssh.ClientConfig) *SSHClient {
@@ -261,7 +269,7 @@ func RunBashInteractive() {
 		Stderr: os.Stderr,
 	}
 
-	sshConfig := configureCredentialsInteractive()
+	sshConfig, _ := configureCredentialsInteractive()
 	client := createClientInteractive(sshConfig)
 
 	if err := client.InitSession(params); err == nil {
