@@ -2,20 +2,16 @@ package bassh
 
 import (
 	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
-
-	"encoding/pem"
 	"strings"
 	"syscall"
 
-	"errors"
-
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -178,22 +174,12 @@ func decryptIfEncrypted(buffer []byte) ([]byte, error) {
 	return buffer, nil
 }
 
-func sshAgent() ssh.AuthMethod {
-	if sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-		return ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
-	}
-	return nil
-}
-
-func configureCredentialsInteractive() (*ssh.ClientConfig, error) {
-	var user, pemKeyLocation string
-	fmt.Printf("SSH username: ")
-	fmt.Scanf("%s", &user)
-	fmt.Printf("SSH pem key location (absolute path): ")
-	fmt.Scanf("%s", &pemKeyLocation)
-
-	return ConfigureCredentials(user, pemKeyLocation)
-}
+//func sshAgent() ssh.AuthMethod {
+//	if sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
+//		return ssh.PublicKeysCallback(agent.NewClient(sshAgent).Signers)
+//	}
+//	return nil
+//}
 
 //ConfigureCredentials returns the ClientConfig struct to be used as part of the
 //SSHClient definition
@@ -207,17 +193,6 @@ func ConfigureCredentials(username string, keypath string) (*ssh.ClientConfig, e
 	}
 	config.Auth = []ssh.AuthMethod{authMethod}
 	return &config, nil
-}
-
-func createClientInteractive(sshConfig *ssh.ClientConfig) *SSHClient {
-	fmt.Printf("IP address: ")
-	var ipAddr string
-	var port int
-	fmt.Scanf("%s", &ipAddr)
-	fmt.Printf("SSH port: ")
-	fmt.Scanf("%d", &port)
-
-	return CreateClient(sshConfig, ipAddr, port)
 }
 
 //CreateClient takes a *ssh.ClientConfig struct as input, ipAddress of the target
@@ -251,24 +226,6 @@ func (client *SSHClient) RunBash() {
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
-
-	if err := client.InitSession(params); err == nil {
-		client.Run("/bin/bash")
-	}
-}
-
-//RunBashInteractive allows the user to configure the SSH client interactively and
-//executes /bin/bash on the remote host specified interactively by the user
-func RunBashInteractive() {
-	params := &SSHParams{
-		Env:    []string{""},
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
-
-	sshConfig, _ := configureCredentialsInteractive()
-	client := createClientInteractive(sshConfig)
 
 	if err := client.InitSession(params); err == nil {
 		client.Run("/bin/bash")

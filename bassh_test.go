@@ -59,3 +59,26 @@ func TestConfigureCredentials_pemKeyExistsButIsInvalid(t *testing.T) {
 		t.Errorf("\nExpected error was: %s\nActual error was: %s", expectedError, err.Error())
 	}
 }
+
+func TestCreateClient(t *testing.T) {
+	//Given
+	expectedCredentials, _ := ConfigureCredentials("testUser", "./test-data/valid-key.pem")
+	expectedIP := "123.123.123.123"
+	expectedPort := 22
+
+	//When
+	actualSSHClient := CreateClient(expectedCredentials, expectedIP, expectedPort)
+
+	//Then
+	if expectedCredentials != actualSSHClient.Config {
+		t.Error("Expected credentials don't match actual credentials")
+	}
+
+	if expectedIP != actualSSHClient.Host {
+		t.Error("Expected IP donest't match actual Host IP")
+	}
+
+	if expectedPort != actualSSHClient.Port {
+		t.Error("Expected port doesn't match actual port")
+	}
+}
