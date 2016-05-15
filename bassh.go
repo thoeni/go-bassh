@@ -132,18 +132,18 @@ func decodeKeyForAuthMethod(file string) (ssh.AuthMethod, error) {
 		fmt.Println("Error while reading the file: ", err)
 		return nil, errors.New("Error while reading the .pem file from disk!")
 	}
-	if decryptedBuffer, err := decryptIfEncrypted(buffer); err != nil {
+	decryptedBuffer, err := decryptIfEncrypted(buffer)
+	if err != nil {
 		return nil, err
-	} else {
-		key, err := ssh.ParsePrivateKey(decryptedBuffer)
-		if err != nil {
-			fmt.Println("Error while parsing private key: ", err)
-			return nil, err
-		}
-		fmt.Println("Private key succesfully decripted and decoded.")
-
-		return ssh.PublicKeys(key), nil
 	}
+	key, err := ssh.ParsePrivateKey(decryptedBuffer)
+	if err != nil {
+		fmt.Println("Error while parsing private key: ", err)
+		return nil, err
+	}
+	fmt.Println("Private key succesfully decripted and decoded.")
+
+	return ssh.PublicKeys(key), nil
 }
 
 func decryptIfEncrypted(buffer []byte) ([]byte, error) {
@@ -201,13 +201,11 @@ func ConfigureCredentials(username string, keypath string) (*ssh.ClientConfig, e
 	var config ssh.ClientConfig
 	config.User = username
 	pemKeyCommand := keypath
-	if authMethod, err := decodeKeyForAuthMethod(pemKeyCommand); err == nil {
-		config.Auth = []ssh.AuthMethod{authMethod}
-		return &config, nil
-	} else {
+	authMethod, err := decodeKeyForAuthMethod(pemKeyCommand)
+	if err != nil {
 		return nil, err
 	}
-
+	config.Auth = []ssh.AuthMethod{authMethod}
 	return &config, nil
 }
 
