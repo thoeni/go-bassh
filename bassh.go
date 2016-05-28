@@ -207,6 +207,16 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 
 //Run opens an SSH session and Runs the command passed as an argument
 func (client *SSHClient) Run(command string) {
+	params := &SSHParams{
+		Env:    []string{""},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	if err := client.InitSession(params); err != nil {
+		fmt.Errorf("Error while initialising SSH session! Error was: %s", err)
+	}
 	defer client.CloseSession()
 	if err := client.Session.Run(command); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
