@@ -51,6 +51,19 @@ func (client *SSHClient) InitSession(params *SSHParams) error {
 	return nil
 }
 
+//InitStandardSession returns a session initialised with default params
+//using stdIn, stdOut and stdErr to prepare the command
+func (client *SSHClient) InitStandardSession() error {
+	params := &SSHParams{
+		Env:    []string{""},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	return client.InitSession(params)
+}
+
 //CloseSession closes the session for the client
 func (client *SSHClient) CloseSession() {
 	client.Session.Close()
@@ -207,17 +220,12 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 
 //Run opens an SSH session and Runs the command passed as an argument
 func (client *SSHClient) Run(command string) {
-	params := &SSHParams{
-		Env:    []string{""},
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
 
-	if err := client.InitSession(params); err != nil {
+	if err := client.InitStandardSession(); err != nil {
 		fmt.Errorf("Error while initialising SSH session! Error was: %s", err)
 	}
 	defer client.CloseSession()
+
 	if err := client.Session.Run(command); err != nil {
 		fmt.Fprintf(os.Stderr, "command run error: %s\n", err)
 		if client.Session == nil {
@@ -225,19 +233,9 @@ func (client *SSHClient) Run(command string) {
 		}
 		os.Exit(1)
 	}
-	return
 }
 
 //RunBash runs /bin/bash on the client
 func (client *SSHClient) RunBash() {
-	params := &SSHParams{
-		Env:    []string{""},
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
-
-	if err := client.InitSession(params); err == nil {
-		client.Run("/bin/bash")
-	}
+	client.Run("/bin/bash")
 }
