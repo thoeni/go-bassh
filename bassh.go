@@ -66,7 +66,12 @@ func (client *SSHClient) InitStandardSession() error {
 
 //CloseSession closes the session for the client
 func (client *SSHClient) CloseSession() {
-	client.Session.Close()
+	if client.Session == nil {
+		return
+	}
+	if err := client.Session.Close(); err != nil {
+		fmt.Printf("Error while closing session: %s", err)
+	}
 }
 
 func (client *SSHClient) prepareCommand(session *ssh.Session, params *SSHParams) error {
@@ -205,6 +210,7 @@ func ConfigureCredentials(username string, keypath string) (*ssh.ClientConfig, e
 		return nil, err
 	}
 	config.Auth = []ssh.AuthMethod{authMethod}
+	config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	return &config, nil
 }
 
@@ -222,7 +228,8 @@ func CreateClient(sshConfig *ssh.ClientConfig, ipAddr string, port int) *SSHClie
 func (client *SSHClient) Run(command string) {
 
 	if err := client.InitStandardSession(); err != nil {
-		fmt.Errorf("Error while initialising SSH session! Error was: %s", err)
+		fmt.Printf("Error while initialising SSH session! Error was: %s\n", err)
+		return
 	}
 	defer client.CloseSession()
 
